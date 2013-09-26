@@ -70,11 +70,11 @@ void ncListen(nc_args_t *nc_args) {
     //could put the accept procedure in a loop to handle multiple clientsl
     //accept a client connection
     int msgLen;
-    fp = fopen(nc_args->filename, "w+");
+    fp = fopen(nc_args->filename, "wb+");
     if ((client_sock = accept(serv_sock, NULL, NULL)) >= 0) {
         while((msgLen = recv(client_sock, data, BUF_LEN, 0)) > 0){
             // Do something with data
-            //fwrite(data, 1, strlen(data), fp);
+            fwrite(data, 1, strlen(data), fp);
             printf("\ndata::%s\n", data);
         }
         fclose(fp);
@@ -87,7 +87,6 @@ void ncListen(nc_args_t *nc_args) {
 
 int nc_client(nc_args_t *nc_args) {
     struct sockaddr_in stSockAddr;
-    char data[BUF_LEN];
     char destAddr[INET_ADDRSTRLEN];
     FILE* fp;
     int SocketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -120,6 +119,7 @@ int nc_client(nc_args_t *nc_args) {
         printf("\ndone!\n");
     }*/
     int fileSize = 0;
+    char* buff;
     printf("\nFilename:%s",nc_args->filename);
     //Open the file and read it into a buffer.
     if (fp = fopen(nc_args->filename, "rb")) {
@@ -129,26 +129,27 @@ int nc_client(nc_args_t *nc_args) {
         fileSize = ftell(fp);
         rewind(fp);
         if (fileSize == 0) {
-            printf("\n Why do you want to send an empty file & waste b/w?");
+            printf("\n Why do you want to send an empty file?");
             exit(0);
         }
-        
-        /*int count =  fread(data, sizeof(char), fileSize, fp);
-        //Increment the file pointer to get to EOF.
+        buff = (char *)malloc(fileSize) ;
+        if(buff == NULL) {
+            printf("Allocation error!");
+            exit(1);
+        }
+        int count =  fread(buff, sizeof(char), BUF_LEN, fp);
+        buff[fileSize] = '\0';
         //Check if the file has been read correctly
+        char d = fgetc(fp);
+        printf("\n\t%s",buff);
         if(!feof(fp)){
             printf("\nError reading file\n");
             exit(EXIT_FAILURE);
-        }*/
-        
-        while( !feof(fp) ) {
-            fread(data, sizeof(char), fileSize, fp);
         }
     }
-    printf("\nFile:%s", data);
     fclose(fp);
     //Send the buffer to the server.
-    int sendClient = send(SocketFD, data, strlen(data), 0);
+    int sendClient = send(SocketFD, buff, strlen(buff), 0);
     if (sendClient != -1) {
         printf("\ndone!\n");
     }
