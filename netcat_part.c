@@ -36,8 +36,7 @@ typedef struct nc_args{
 void ncListen(nc_args_t *nc_args) {
     
     char destAddr[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(nc_args->destaddr.sin_addr), destAddr, INET_ADDRSTRLEN);
-    fflush(stdout);
+    FILE* fp;
 
     //Server socket for listening on nc_args
     int serv_sock, client_sock, client_addr_size;
@@ -53,9 +52,7 @@ void ncListen(nc_args_t *nc_args) {
     memset(&serv_addr, 0, sizeof(serv_addr));
     
     //Set the struct sockaddr
-    serv_addr.sin_family = nc_args->destaddr.sin_family;
-    serv_addr.sin_port   = nc_args->port;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr = nc_args->destaddr;
 
     //optionally bind() the sock
     if( bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
@@ -69,14 +66,18 @@ void ncListen(nc_args_t *nc_args) {
         printf("Listen failed!");
         exit(EXIT_FAILURE);
     }
+    
     //could put the accept procedure in a loop to handle multiple clientsl
     //accept a client connection
     int msgLen;
+    fp = fopen(nc_args->filename, "w+");
     if ((client_sock = accept(serv_sock, NULL, NULL)) >= 0) {
         while((msgLen = recv(client_sock, data, BUF_LEN, 0)) > 0){
             // Do soomething with data
+            fwrite(data, 1, strlen(data), fp);
             printf("\ndata::%s\n", data);
         }
+        fclose(fp);
         //close the connection
         close(client_sock);
     }
@@ -98,11 +99,9 @@ int nc_client(nc_args_t *nc_args) {
     }
  
     memset(&stSockAddr, 0, sizeof(stSockAddr));
- 
-    stSockAddr.sin_family = nc_args->destaddr.sin_family;
-    stSockAddr.sin_port = nc_args->port;
-    stSockAddr.sin_addr = nc_args->destaddr.sin_addr;
- 
+    
+    stSockAddr = nc_args->destaddr;
+
     if (-1 == connect(SocketFD, (struct sockaddr *)&stSockAddr, sizeof(stSockAddr)))
     {
       perror("connect failed");
@@ -112,15 +111,29 @@ int nc_client(nc_args_t *nc_args) {
  
     /* perform read write operations ... 
     char * sendBuff = (char *)malloc(100);
-    memset(sendBuff, 0, 100);*/
+    memset(sendBuff, 0, 100);
     printf("\nEnter data to send\n");
     scanf("%s", data);
     int sendClient = send(SocketFD, data, strlen(data), 0);
     if (sendClient != -1)
     {
         printf("\ndone!\n");
+    }*/
+    //Open the file and read it into a buffer.
+    if (fp = fopen(nc_args->filename, "rb")) {
+        fread(data, sizeof(char), 1024, fp);
+        //Check if the file has been read correctly
+        if(!feof(fp)){
+            printf("\nError reading file\n");
+            exit(EXIT_FAILURE);
+        }
     }
-
+    fclose(fp);
+    //Send the buffer to the server.
+    int sendClient = send(SocketFD, data, strlen(data), 0);
+    if (sendClient != -1) {
+        printf("\ndone!\n");
+    }
     (void) shutdown(SocketFD, SHUT_RDWR);
  
     close(SocketFD);
