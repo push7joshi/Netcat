@@ -38,6 +38,8 @@ void ncListen(nc_args_t *nc_args) {
     char destAddr[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(nc_args->destaddr.sin_addr), destAddr, INET_ADDRSTRLEN);
     fflush(stdout);
+    
+    FILE* fp = nc_args->filename;
 
     //Server socket for listening on nc_args
     int serv_sock, client_sock, client_addr_size;
@@ -53,10 +55,8 @@ void ncListen(nc_args_t *nc_args) {
     memset(&serv_addr, 0, sizeof(serv_addr));
     
     //Set the struct sockaddr
-    serv_addr.sin_family = nc_args->destaddr.sin_family;
-    serv_addr.sin_port   = nc_args->port;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
+    serv_addr = nc_args->destaddr;
+    
     //optionally bind() the sock
     if( bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
         printf("Failed to bind the socket!");
@@ -86,9 +86,9 @@ void ncListen(nc_args_t *nc_args) {
 
 int nc_client(nc_args_t *nc_args) {
     struct sockaddr_in stSockAddr;
-    char data[BUF_LEN];
+    char buffer[BUF_LEN];
     char destAddr[INET_ADDRSTRLEN];
-    FILE* fp;
+    FILE* fp ;
     int SocketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
  
     if (-1 == SocketFD)
@@ -98,10 +98,8 @@ int nc_client(nc_args_t *nc_args) {
     }
  
     memset(&stSockAddr, 0, sizeof(stSockAddr));
- 
-    stSockAddr.sin_family = nc_args->destaddr.sin_family;
-    stSockAddr.sin_port = nc_args->port;
-    stSockAddr.sin_addr = nc_args->destaddr.sin_addr;
+    
+    stSockAddr = nc_args->destaddr;
  
     if (-1 == connect(SocketFD, (struct sockaddr *)&stSockAddr, sizeof(stSockAddr)))
     {
@@ -113,9 +111,17 @@ int nc_client(nc_args_t *nc_args) {
     /* perform read write operations ... 
     char * sendBuff = (char *)malloc(100);
     memset(sendBuff, 0, 100);*/
+    //read file and store data to buffer
+    int count=0;
+    if (fp = fopen(nc_args->filename, 'rb')) {
+        while(!foef(fp)) {
+            count = fread(buffer, sizeof(char), 100, fp);
+        }
+    }
+
     printf("\nEnter data to send\n");
-    scanf("%s", data);
-    int sendClient = send(SocketFD, data, strlen(data), 0);
+    scanf("%s", buffer);
+    int sendClient = send(SocketFD, buffer, strlen(buffer), 0);
     if (sendClient != -1)
     {
         printf("\ndone!\n");
