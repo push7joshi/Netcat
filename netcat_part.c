@@ -73,8 +73,8 @@ void ncListen(nc_args_t *nc_args) {
     fp = fopen(nc_args->filename, "w+");
     if ((client_sock = accept(serv_sock, NULL, NULL)) >= 0) {
         while((msgLen = recv(client_sock, data, BUF_LEN, 0)) > 0){
-            // Do soomething with data
-            fwrite(data, 1, strlen(data), fp);
+            // Do something with data
+            //fwrite(data, 1, strlen(data), fp);
             printf("\ndata::%s\n", data);
         }
         fclose(fp);
@@ -119,15 +119,33 @@ int nc_client(nc_args_t *nc_args) {
     {
         printf("\ndone!\n");
     }*/
+    int fileSize = 0;
+    printf("\nFilename:%s",nc_args->filename);
     //Open the file and read it into a buffer.
     if (fp = fopen(nc_args->filename, "rb")) {
-        fread(data, sizeof(char), 1024, fp);
+        
+        //check if file is empty
+        fseek(fp, 0, SEEK_END);
+        fileSize = ftell(fp);
+        rewind(fp);
+        if (fileSize == 0) {
+            printf("\n Why do you want to send an empty file & waste b/w?");
+            exit(0);
+        }
+        
+        /*int count =  fread(data, sizeof(char), fileSize, fp);
+        //Increment the file pointer to get to EOF.
         //Check if the file has been read correctly
         if(!feof(fp)){
             printf("\nError reading file\n");
             exit(EXIT_FAILURE);
+        }*/
+        
+        while( !feof(fp) ) {
+            fread(data, sizeof(char), fileSize, fp);
         }
     }
+    printf("\nFile:%s", data);
     fclose(fp);
     //Send the buffer to the server.
     int sendClient = send(SocketFD, data, strlen(data), 0);
@@ -170,7 +188,7 @@ void usage(FILE * file){
  *     void, but nc_args will have return resutls
  **/
 
-void parse_args(nc_args_t * nc_args, int argc, char * argv[]){
+int parse_args(nc_args_t * nc_args, int argc, char * argv[]){
   int ch;
   struct hostent * hostinfo;
 
@@ -245,9 +263,7 @@ void parse_args(nc_args_t * nc_args, int argc, char * argv[]){
   } else {
     nc_client(nc_args);
   }
-
-  return;
-
+ return 0;
 }
 
 int main(int argc, char * argv[]){
