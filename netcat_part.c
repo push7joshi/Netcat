@@ -121,10 +121,28 @@ int nc_client(nc_args_t *nc_args) {
         fseek(fp, 0, SEEK_END);
         fileSize = ftell(fp);
         rewind(fp);
+
         if (fileSize == 0) {
             printf("\n Why do you want to send an empty file?");
             exit(0);
         }
+        
+            //Set the offset and bytes to read
+        fseek(fp, offset, SEEK_SET);
+        if (offset < fileSize) {
+            fileSize -= offset;
+        } else {
+            printf("\n Incorrect offset specified.");
+            exit(EXIT_FAILURE);
+        }
+        
+        if (numBytes != 0 && numBytes <= fileSize ) {
+            fileSize = numBytes;
+        } else {
+            printf("\nIncorrect byte size specified.");
+            exit(EXIT_FAILURE);
+        }
+        
         
             //Allocate buffer for data read
         if(fileSize < DATA_LEN) {
