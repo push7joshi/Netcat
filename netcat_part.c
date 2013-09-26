@@ -37,7 +37,6 @@ void ncListen(nc_args_t *nc_args) {
     
     char destAddr[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(nc_args->destaddr.sin_addr), destAddr, INET_ADDRSTRLEN);
-    printf("\nport:%d\tdest:%s\tlisten:%d", nc_args->port, destAddr, nc_args->listen);
     fflush(stdout);
 
     //Server socket for listening on nc_args
@@ -76,7 +75,7 @@ void ncListen(nc_args_t *nc_args) {
     if ((client_sock = accept(serv_sock, NULL, NULL)) >= 0) {
         while((msgLen = recv(client_sock, data, BUF_LEN, 0)) > 0){
             // Do soomething with data
-            printf("\n\n%d\tdata::%s\t%d\n",msgLen, data, msgLen);
+            printf("\ndata::%s\n", data);
         }
         //close the connection
         close(client_sock);
@@ -89,7 +88,7 @@ int nc_client(nc_args_t *nc_args) {
     struct sockaddr_in stSockAddr;
     char data[BUF_LEN];
     char destAddr[INET_ADDRSTRLEN];
-
+    FILE* fp;
     int SocketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
  
     if (-1 == SocketFD)
@@ -102,20 +101,7 @@ int nc_client(nc_args_t *nc_args) {
  
     stSockAddr.sin_family = nc_args->destaddr.sin_family;
     stSockAddr.sin_port = nc_args->port;
-    int Res = inet_ntop(AF_INET, &(nc_args->destaddr.sin_addr), destAddr, INET_ADDRSTRLEN);
-    
-    if (0 > Res)
-    {
-      perror("error: first parameter is not a valid address family");
-      close(SocketFD);
-      exit(EXIT_FAILURE);
-    }
-    else if (0 == Res)
-    {
-      perror("char string (second parameter does not contain valid ipaddress)");
-      close(SocketFD);
-      exit(EXIT_FAILURE);
-    }
+    stSockAddr.sin_addr = nc_args->destaddr.sin_addr;
  
     if (-1 == connect(SocketFD, (struct sockaddr *)&stSockAddr, sizeof(stSockAddr)))
     {
@@ -228,7 +214,7 @@ void parse_args(nc_args_t * nc_args, int argc, char * argv[]){
     usage(stderr);
     exit(1);
   }
-
+    
   nc_args->destaddr.sin_family = hostinfo->h_addrtype;
   bcopy((char *) hostinfo->h_addr,
         (char *) &(nc_args->destaddr.sin_addr.s_addr),
@@ -241,7 +227,7 @@ void parse_args(nc_args_t * nc_args, int argc, char * argv[]){
   nc_args->filename = malloc(strlen(argv[1])+1);
   strncpy(nc_args->filename,argv[1],strlen(argv[1])+1);
   if(nc_args->listen == 1) {
-      printf("\ncalling server\n");
+      printf("\nRunning server -\n");
       ncListen(nc_args);  
   } else {
     nc_client(nc_args);
