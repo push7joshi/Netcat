@@ -77,9 +77,9 @@ void ncListen(nc_args_t *nc_args) {
         while((msgLen = recv(client_sock, data, DATA_LEN, 0)) > 0){
                 // Do something with data
             fwrite(data, 1, strlen(data), fp);
-            printf("\ndata::%s\n", data);
             memset(data,'\0', strlen(data));
         }
+        printf("\nFile transferred.");
         fclose(fp);
             //close the connection
         close(client_sock);
@@ -93,6 +93,7 @@ int nc_client(nc_args_t *nc_args) {
     char destAddr[INET_ADDRSTRLEN];
     FILE* fp;
     int SocketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    char webResponse[1024];
     
     if (-1 == SocketFD)
     {
@@ -113,7 +114,6 @@ int nc_client(nc_args_t *nc_args) {
     
     int fileSize = 0, numBytes = nc_args->n_bytes, offset = nc_args->offset, buffSize;
     char* buff;
-    printf("\nFilename:%s",nc_args->filename);
         //Open the file and read it into a buffer.
     if (fp = fopen(nc_args->filename, "r")) {
         
@@ -127,6 +127,30 @@ int nc_client(nc_args_t *nc_args) {
             exit(0);
         }
         
+        if (nc_args->website) {
+            char * web = (char*)malloc(fileSize);
+            int msgLen;
+            FILE* getFile = fopen("webFile.txt","w+");
+            
+            fread(web, sizeof(char), fileSize, fp);
+            
+            int sendClient = send(SocketFD, web, strlen(web)-1, 0);
+            if (sendClient == -1) {
+                printf("\nError sending!\n");
+                exit(EXIT_FAILURE);
+            }
+            
+            while((msgLen = recv(SocketFD, webResponse, 1024, 0)) > 0){
+                    // Do something with data
+                fwrite(webResponse, 1, strlen(webResponse), getFile);
+                memset(webResponse,'\0', strlen(webResponse));
+            }
+            
+            printf("\nThe web response is written to webFile.txt.\n");
+            exit(0);
+            
+        }
+        
             //Set the offset and bytes to read
         fseek(fp, offset, SEEK_SET);
         if (offset < fileSize) {
@@ -136,13 +160,12 @@ int nc_client(nc_args_t *nc_args) {
             exit(EXIT_FAILURE);
         }
         
-        if (numBytes != 0 && numBytes <= fileSize ) {
-            fileSize = numBytes;
-        } else {
+        if (numBytes > fileSize) {
             printf("\nIncorrect byte size specified.");
             exit(EXIT_FAILURE);
+        } else if (numBytes != 0 ){
+            fileSize = numBytes;
         }
-        
         
             //Allocate buffer for data read
         if(fileSize < DATA_LEN) {
@@ -158,7 +181,6 @@ int nc_client(nc_args_t *nc_args) {
             if (remBytes < DATA_LEN) {
                 buff = (char *)malloc(remBytes) ;
                 buffSize = remBytes;
-                printf("\nRemaining:%d", remBytes);
             } else {
                 buff = (char *)malloc(buffSize);
             }
@@ -170,8 +192,6 @@ int nc_client(nc_args_t *nc_args) {
             }
             countRead +=  fread(buff, sizeof(char), buffSize, fp);
             remBytes -= buffSize;
-           
-            printf("\n%d", buffSize);
            
                 //Send the buffer to the server.
             int sendClient = send(SocketFD, buff, strlen(buff)-1, 0);
@@ -229,7 +249,7 @@ int parse_args(nc_args_t * nc_args, int argc, char * argv[]){
     nc_args->port     = 6767;
     nc_args->verbose  = 0;
     
-    while ((ch = getopt(argc, argv, "hvp:n:o:l")) != -1) {
+    while ((ch = getopt(argc, argv, "hvp:n:o:wl")) != -1) {
         switch (ch) {
             case 'h': //help
                 usage(stdout);
@@ -304,11 +324,6 @@ int main(int argc, char * argv[]){
     
         //initializes the arguments struct for your use
     parse_args(&nc_args, argc, argv);
-    
-    
-    /**
-     * FILL ME IN
-     **/
     
     return 0;
 }
