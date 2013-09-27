@@ -47,6 +47,9 @@ void ncListen(nc_args_t *nc_args) {
     
         //open the socket
     serv_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (nc_args->verbose) {
+        printf("\nServer socket created. Binding to the port.");
+    }
     if(serv_sock == -1) {
         printf("\n Cannot create socket!");
         exit(EXIT_FAILURE);
@@ -68,6 +71,9 @@ void ncListen(nc_args_t *nc_args) {
         printf("Listen failed!");
         exit(EXIT_FAILURE);
     }
+    if (nc_args->verbose) {
+        printf("\nListening on the specified port...");
+    }
     
         //could put the accept procedure in a loop to handle multiple clientsl
         //accept a client connection
@@ -75,13 +81,19 @@ void ncListen(nc_args_t *nc_args) {
     fp = fopen(nc_args->filename, "w");
     if ((client_sock = accept(serv_sock, NULL, NULL)) >= 0) {
         while((msgLen = recv(client_sock, data, DATA_LEN, 0)) > 0){
+            if(nc_args->verbose) {
+                printf("\nWriting data to file..");
+            }
                 // Do something with data
             fwrite(data, 1, strlen(data), fp);
             memset(data,'\0', strlen(data));
         }
-        printf("\nFile transferred.");
+        printf("\nFile transferred.\n");
         fclose(fp);
             //close the connection
+        if (nc_args->verbose) {
+            printf("\nDone with the transfer, terminating.\n");
+        }
         close(client_sock);
     }
 }
@@ -100,6 +112,9 @@ int nc_client(nc_args_t *nc_args) {
         perror("cannot create socket");
         exit(EXIT_FAILURE);
     }
+    if (nc_args->verbose) {
+        printf("\nClient socket created. Connecting...");
+    }
     
     memset(&stSockAddr, 0, sizeof(stSockAddr));
     
@@ -112,6 +127,10 @@ int nc_client(nc_args_t *nc_args) {
         exit(EXIT_FAILURE);
     }
     
+    if (nc_args->verbose) {
+        printf("\nConnected to the server, will try to send the data...");
+    }
+
     int fileSize = 0, numBytes = nc_args->n_bytes, offset = nc_args->offset, buffSize;
     char* buff;
         //Open the file and read it into a buffer.
@@ -176,6 +195,9 @@ int nc_client(nc_args_t *nc_args) {
         
             //Read the file into buffer.
         int countRead =0, remBytes = fileSize;
+        if (nc_args->verbose) {
+            printf("\nHang on, trying to send data...");
+        }
         while(remBytes > 0) {
             
             if (remBytes < DATA_LEN) {
@@ -195,6 +217,10 @@ int nc_client(nc_args_t *nc_args) {
            
                 //Send the buffer to the server.
             int sendClient = send(SocketFD, buff, strlen(buff)-1, 0);
+            if (nc_args->verbose) {
+                printf("\nSending data..");
+            }
+
             if (sendClient == -1) {
                 printf("\nError sending!\n");
                 exit(EXIT_FAILURE);
