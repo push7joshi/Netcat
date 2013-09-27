@@ -1,0 +1,321 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+
+#include <openssl/hmac.h> // need to add -lssl to compile
+
+#define BUF_LEN 1024
+
+/** Warning: This is a very weak supplied shared key...as a result it is not
+ * really something you'd ever want to use again :)
+ */
+static const char key[16] = { 0xfa, 0xe2, 0x01, 0xd3, 0xba, 0xa9,
+    0x9b, 0x28, 0x72, 0x61, 0x5c, 0xcc, 0x3f, 0x28, 0x17, 0x0e };
+
+/**
+ * Structure to hold all relevant state
+ **/
+typedef struct nc_args{
+    struct            sockaddr_in destaddr; //destination/server address
+    unsigned short    port; //destination/listen port
+    unsigned short    listen; //listen flag
+    int               n_bytes; //number of bytes to send
+    int               offset; //file offset
+    int               verbose; //verbose output info
+    int               website; // retrieve website at client
+    char*             filename; //input/output file
+}nc_args_t;
+
+typedef struct Hash_Msg{
+    unsigned int hashlen;
+    unsigned char hash[20];
+    char data[1000];
+}Hash_Msg;
+
+Hash_Msg* get_hash(char* data){
+    Hash_Msg* msg = malloc(sizeof(Hash_Msg));
+    bzero(msg,sizeof(Hash_Msg));
+    strcpy(msg->data,data);
+    HMAC(EVP_sha1(), &key, sizeof(key), (unsigned char*)msg->data, sizeof(msg->data), (unsigned char*)msg->hash, &(msg->hashlen));
+    return msg;
+};
+
+int check_hash(Hash_Msg* msg){
+    unsigned char* computed_hash = malloc(sizeof(msg->hash));
+    unsigned int computed_hashlen;
+    HMAC(EVP_sha1(), &key, sizeof(key), (unsigned char*)msg->data, sizeof(msg->data), (unsigned char*)computed_hash, &computed_hashlen);
+    unsigned char* msg_hash = msg->hash;
+    int i = 0;
+        //bool auth = true;
+        //printf("\nnew hash\n%s",computed_hash);
+    for (i = 0;i<sizeof(msg->hash);i++){
+        if (*(msg_hash+i) != *(computed_hash+i)){
+            return 0;
+        }
+    }
+    return 1;
+}
+
+
+void ncListen(nc_args_t *nc_args) {
+    
+    char destAddr[INET_ADDRSTRLEN];
+    FILE* fp;
+    
+        //Server socket for listening on nc_args
+    int serv_sock, client_sock, client_addr_size;
+    struct sockaddr_in serv_addr, client_addr;
+    char data[BUF_LEN];
+    
+        //open the socket
+    serv_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(serv_sock == -1) {
+        printf("\n Cannot create socket!");
+        exit(EXIT_FAILURE);
+    }
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    
+        //Set the struct sockaddr
+    serv_addr = nc_args->destaddr;
+    
+        //optionally bind() the sock
+    if( bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
+        printf("Failed to bind the socket!");
+        close(serv_sock);
+        exit(EXIT_FAILURE);
+    }
+    
+        //set listen to up to 5 queued connections
+    if ( listen(serv_sock, 5) == -1) {
+        printf("Listen failed!");
+        exit(EXIT_FAILURE);
+    }
+    
+        //could put the accept procedure in a loop to handle multiple clientsl
+        //accept a client connection
+    int msgLen;
+    fp = fopen(nc_args->filename, "w+");
+    if ((client_sock = accept(serv_sock, NULL, NULL)) >= 0) {
+        while((msgLen = recv(client_sock, data, BUF_LEN, 0)) > 0){
+                // Do something with data
+                //fwrite(data, 1, strlen(data), fp);
+            Hash_Msg* msg = (Hash_Msg*)data;
+            if(check_hash(msg)==0){
+                printf("get lost hash does not match");
+            }
+            else{
+                printf("\ndata::%s\n", msg->data);
+            }
+        }
+        fclose(fp);
+            //close the connection
+        close(client_sock);
+    }
+}
+
+
+
+int nc_client(nc_args_t *nc_args) {
+    struct sockaddr_in stSockAddr;
+    char data[BUF_LEN];
+    char destAddr[INET_ADDRSTRLEN];
+    FILE* fp;
+    int SocketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    
+    if (-1 == SocketFD)
+    {
+        perror("cannot create socket");
+        exit(EXIT_FAILURE);
+    }
+    
+    memset(&stSockAddr, 0, sizeof(stSockAddr));
+    
+    stSockAddr = nc_args->destaddr;
+    
+    if (-1 == connect(SocketFD, (struct sockaddr *)&stSockAddr, sizeof(stSockAddr)))
+    {
+        perror("connect failed");
+        close(SocketFD);
+        exit(EXIT_FAILURE);
+    }
+    
+    /* perform read write operations ...
+     char * sendBuff = (char *)malloc(100);
+     memset(sendBuff, 0, 100);
+     printf("\nEnter data to send\n");
+     scanf("%s", data);
+     int sendClient = send(SocketFD, data, strlen(data), 0);
+     if (sendClient != -1)
+     {
+     printf("\ndone!\n");
+     }*/
+    int fileSize = 0;
+    printf("\nFilename:%s",nc_args->filename);
+        //Open the file and read it into a buffer.
+    if (fp = fopen(nc_args->filename, "rb")) {
+        
+            //check if file is empty
+        fseek(fp, 0, SEEK_END);
+        fileSize = ftell(fp);
+        rewind(fp);
+        if (fileSize == 0) {
+            printf("\nEmplty File");
+            exit(0);
+        }
+        
+        /*int count =  fread(data, sizeof(char), fileSize, fp);
+         //Increment the file pointer to get to EOF.
+         //Check if the file has been read correctly
+         if(!feof(fp)){
+         printf("\nError reading file\n");
+         exit(EXIT_FAILURE);
+         }*/
+        
+        while( !feof(fp) ) {
+            fread(data, sizeof(char), fileSize, fp);
+        }
+    }
+    printf("\nFile:%s", data);
+    fclose(fp);
+        //Send the buffer to the server.
+    Hash_Msg* msg = get_hash(data);
+    int sendClient = send(SocketFD, msg, sizeof(Hash_Msg), 0);
+    if (sendClient != -1) {
+        printf("\ndone!\n");
+    }
+    (void) shutdown(SocketFD, SHUT_RDWR);
+    
+    close(SocketFD);
+    return EXIT_SUCCESS;
+}
+
+/**
+ * usage(FILE * file) -> void
+ *
+ * Write the usage info for netcat_part to the give file pointer.
+ */
+void usage(FILE * file){
+    fprintf(file,
+            "netcat_part [OPTIONS]  dest_ip file \n"
+            "\t -h           \t\t Print this help screen\n"
+            "\t -v           \t\t Verbose output\n"
+            "\t -w           \t\t Enable website get mode at client\n"
+            "\t -p port      \t\t Set the port to connect on (dflt: 6767)\n"
+            "\t -n bytes     \t\t Number of bytes to send, defaults whole file\n"
+            "\t -o offset    \t\t Offset into file to start sending\n"
+            "\t -l           \t\t Listen on port instead of connecting and write output to file\n"
+            "                \t\t and dest_ip refers to which ip to bind to (dflt: localhost)\n"
+            );
+}
+
+/**
+ *parse_args(nc_args_t * nc_args, int argc, char * argv[]) -> void
+ *
+ * Given a pointer to a nc_args struct and the command line argument
+ * info, set all the arguments for nc_args to function use getopt()
+ * procedure.
+ *
+ * Return:
+ *     void, but nc_args will have return resutls
+ **/
+
+int parse_args(nc_args_t * nc_args, int argc, char * argv[]){
+    int ch;
+    struct hostent * hostinfo;
+    
+        //set defaults
+    nc_args->n_bytes  = 0;
+    nc_args->offset   = 0;
+    nc_args->listen   = 0;
+    nc_args->port     = 6767;
+    nc_args->verbose  = 0;
+    
+    while ((ch = getopt(argc, argv, "hvp:n:o:l")) != -1) {
+        switch (ch) {
+            case 'h': //help
+                usage(stdout);
+                exit(0);
+                break;
+            case 'l': //listen
+                nc_args->listen = 1;
+                break;
+            case 'p': //port
+                nc_args->port = atoi(optarg);
+                break;
+            case 'o'://offset
+                nc_args->offset = atoi(optarg);
+                break;
+            case 'n'://bytes
+                nc_args->n_bytes = atoi(optarg);
+                break;
+            case 'v':
+                nc_args->verbose = 1;
+                break;
+            case 'w':
+                nc_args->website = 1;
+                break;
+            default:
+                fprintf(stderr,"ERROR: Unknown option '-%c'\n",ch);
+                usage(stdout);
+                exit(1);
+        }
+    }
+    
+    argc -= optind;
+    argv += optind;
+    
+    if (argc < 2){
+        fprintf(stderr, "ERROR: Require ip and file\n");
+        usage(stderr);
+        exit(1);
+    }
+    
+    /* Initial the sockaddr_in based on the parsing */
+    if(!(hostinfo = gethostbyname(argv[0]))){
+        fprintf(stderr,"ERROR: Invalid host name %s",argv[0]);
+        usage(stderr);
+        exit(1);
+    }
+    
+    nc_args->destaddr.sin_family = hostinfo->h_addrtype;
+    bcopy((char *) hostinfo->h_addr,
+          (char *) &(nc_args->destaddr.sin_addr.s_addr),
+          hostinfo->h_length);
+    
+        //listen or accept data on port specified
+    nc_args->destaddr.sin_port = htons(nc_args->port);
+    
+    /* Save file name */
+    nc_args->filename = malloc(strlen(argv[1])+1);
+    strncpy(nc_args->filename,argv[1],strlen(argv[1])+1);
+    if(nc_args->listen == 1) {
+        printf("\nRunning server -\n");
+        ncListen(nc_args);  
+    } else {
+        nc_client(nc_args);
+    }
+    return 0;
+}
+
+int main(int argc, char * argv[]){
+    
+    nc_args_t nc_args;
+    int sockfd;
+    char input[BUF_LEN];
+    
+        //initializes the arguments struct for your use
+    parse_args(&nc_args, argc, argv);
+    
+    
+    /**
+     * FILL ME IN
+     **/
+    
+    return 0;
+}

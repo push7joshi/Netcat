@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+Date: Fri, 27 Sep 2013 01:01:36 GMT
+Server: Apache
+Last-Modified: Mon, 26 Aug 2013 13:34:07 GMT
+ETag: "66610ac-43-4e4d9cf86be2f"
+Accept-Ranges: bytes
+Content-Length: 67
+Content-Type: text/plain; charset=UTF-8
+X-Powered-By: Mono
+Connection: close
+
+Hello!  You have successfully retrieved the text from this file :)
