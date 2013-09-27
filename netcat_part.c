@@ -333,6 +333,19 @@ int parse_args(nc_args_t * nc_args, int argc, char * argv[]){
     /* Save file name */
     nc_args->filename = malloc(strlen(argv[1])+1);
     strncpy(nc_args->filename,argv[1],strlen(argv[1])+1);
+    
+    if (nc_args->verbose) {
+        printf("\nNetcat_part:\n\n");
+        printf("Port: %d", nc_args->port);
+        printf("Offset: %d", nc_args->offset);
+        if(nc_args->n_bytes) {
+            printf("Bytes to transfer: %d", nc_args->n_bytes);
+        } else {
+            printf("Bytes to transfer: all");
+        }
+        printf("Verbose: true");
+    }
+    
     if(nc_args->listen == 1) {
         printf("\nRunning server -\n");
         ncListen(nc_args);  
